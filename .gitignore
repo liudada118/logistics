@@ -1,0 +1,21 @@
+# Java
+*.class
+*.jar
+*.war
+target/
+.idea/
+*.iml
+
+# Node
+node_modules/
+dist/
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+.webdev/
+*.log
