@@ -1,5 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import { receiptApi, waybillApi } from '../lib/api';
+import DashboardLayout from '@/components/DashboardLayout';
+import { receiptApi } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { FileText, Search, Send, Package, RotateCcw, CheckCircle, ArrowRight, Undo2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const receiptActions = ['签收', '寄出', '收到', '返厂', '反签收', '反寄出'];
 
@@ -8,7 +21,7 @@ export default function ReceiptManage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState('');
-  const [filterAction, setFilterAction] = useState('');
+  const [filterAction, setFilterAction] = useState('all');
   const [loading, setLoading] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [dialogAction, setDialogAction] = useState('签收');
@@ -21,7 +34,7 @@ export default function ReceiptManage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await receiptApi.list({ page, size: 20, keyword, action: filterAction });
+      const res = await receiptApi.list({ page, size: 20, keyword, action: filterAction === 'all' ? '' : filterAction });
       setRecords(res.records || []);
       setTotal(res.total || 0);
     } catch {
@@ -40,7 +53,7 @@ export default function ReceiptManage() {
   };
 
   const handleSubmit = async () => {
-    if (!form.waybillId) { alert('请输入运单ID'); return; }
+    if (!form.waybillId) { toast.error('请输入运单ID'); return; }
     const data = { operatorId: 1, operatorName: '管理员', orgId: 1, remark: form.remark, expressNo: form.expressNo };
     try {
       switch (dialogAction) {
@@ -51,129 +64,230 @@ export default function ReceiptManage() {
         case '反签收': await receiptApi.unsignReceipt(+form.waybillId, data); break;
         case '反寄出': await receiptApi.unsendReceipt(+form.waybillId, data); break;
       }
+      toast.success(`回单${dialogAction}操作成功`);
       setShowDialog(false);
       fetchData();
-    } catch (e: any) { alert(e.message || '操作失败'); }
+    } catch (e: any) { toast.error(e.message || '操作失败'); }
   };
 
-  const actionColor = (a: string) => {
-    if (a === '签收') return 'bg-green-100 text-green-700';
-    if (a === '寄出') return 'bg-blue-100 text-blue-700';
-    if (a === '收到') return 'bg-purple-100 text-purple-700';
-    if (a === '返厂') return 'bg-orange-100 text-orange-700';
-    if (a.startsWith('反')) return 'bg-red-100 text-red-700';
-    return 'bg-gray-100 text-gray-700';
-  };
+  // 统计
+  const actionCounts = receiptActions.reduce((acc, a) => {
+    acc[a] = records.filter(r => r.action === a).length;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">回单管理</h1>
-        <div className="flex gap-2">
-          {['签收', '寄出', '收到', '返厂'].map(a => (
-            <button key={a} onClick={() => openAction(a)}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-              回单{a}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 回单状态流程说明 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
-          <strong>回单流程：</strong>待签收 → 已签收 → 已寄出 → 已收到 → 已返厂
-          &nbsp;&nbsp;|&nbsp;&nbsp;
-          <strong>反向操作：</strong>反签收、反寄出可撤销对应步骤
-        </p>
-      </div>
-
-      {/* 筛选 */}
-      <div className="flex gap-4 items-center">
-        <input type="text" placeholder="搜索运单号/操作人..." value={keyword}
-          onChange={e => setKeyword(e.target.value)} className="px-3 py-2 border rounded-lg w-64" />
-        <select value={filterAction} onChange={e => setFilterAction(e.target.value)} className="px-3 py-2 border rounded-lg">
-          <option value="">全部操作</option>
-          {receiptActions.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-      </div>
-
-      {/* 列表 */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">运单号</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">回单份数</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">快递单号</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作人</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">备注</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作时间</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
-            ) : records.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无回单记录</td></tr>
-            ) : records.map(r => (
-              <tr key={r.id}>
-                <td className="px-4 py-3 text-sm font-medium text-blue-600">{r.waybillNo}</td>
-                <td className="px-4 py-3 text-sm">
-                  <span className={`px-2 py-1 rounded text-xs ${actionColor(r.action)}`}>{r.action}</span>
-                </td>
-                <td className="px-4 py-3 text-sm">{r.receiptCount || '-'}</td>
-                <td className="px-4 py-3 text-sm">{r.expressNo || '-'}</td>
-                <td className="px-4 py-3 text-sm">{r.operatorName}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{r.remark || '-'}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{r.createdAt?.replace('T', ' ').slice(0, 16)}</td>
-              </tr>
+    <DashboardLayout>
+      <div className="p-4 lg:p-6 space-y-4">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-foreground" style={{ fontFamily: 'DM Sans' }}>回单管理</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">共 {total} 条回单记录{loading ? ' · 加载中...' : ''}</p>
+          </div>
+          <div className="flex gap-2">
+            {['签收', '寄出', '收到', '返厂'].map(a => (
+              <Button key={a} size="sm" onClick={() => openAction(a)}
+                className={actionButtonStyle(a)}>
+                {actionIcon(a)}
+                {a}
+              </Button>
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 分页 */}
-      {total > 20 && (
-        <div className="flex justify-center gap-2">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-          <span className="px-3 py-1">第 {page} 页 / 共 {Math.ceil(total / 20)} 页</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / 20)} className="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
-        </div>
-      )}
-
-      {/* 操作对话框 */}
-      {showDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">回单{dialogAction}</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">运单ID *</label>
-                <input type="number" value={form.waybillId} onChange={e => setForm({ ...form, waybillId: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg" placeholder="输入运单ID" />
-              </div>
-              {dialogAction === '寄出' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">快递单号</label>
-                  <input type="text" value={form.expressNo} onChange={e => setForm({ ...form, expressNo: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg" placeholder="输入快递单号" />
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
-                <textarea value={form.remark} onChange={e => setForm({ ...form, remark: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg" rows={2} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-4">
-              <button onClick={() => setShowDialog(false)} className="px-4 py-2 border rounded-lg">取消</button>
-              <button onClick={handleSubmit} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">确认</button>
-            </div>
           </div>
         </div>
-      )}
-    </div>
+
+        {/* 流程说明 */}
+        <div className="bg-blue-50/50 border border-blue-200/50 rounded-lg p-3">
+          <div className="flex items-center gap-2 text-xs text-blue-700">
+            <FileText className="w-3.5 h-3.5 shrink-0" />
+            <span><strong>回单流程：</strong></span>
+            <span className="flex items-center gap-1">
+              待签收 <ArrowRight className="w-3 h-3" /> 已签收 <ArrowRight className="w-3 h-3" /> 已寄出 <ArrowRight className="w-3 h-3" /> 已收到 <ArrowRight className="w-3 h-3" /> 已返厂
+            </span>
+            <span className="text-blue-500 mx-1">|</span>
+            <span><strong>反向操作：</strong>反签收、反寄出可撤销对应步骤</span>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {receiptActions.map(a => (
+            <div key={a} className="bg-card border border-border rounded-lg p-2.5 text-center">
+              <p className="text-xs text-muted-foreground">{a}</p>
+              <p className={`text-lg font-bold mt-0.5 ${actionCountColor(a)}`}>{actionCounts[a] || 0}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="搜索运单号、操作人..."
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="pl-9 h-9 bg-card text-sm"
+            />
+          </div>
+          <Select value={filterAction} onValueChange={setFilterAction}>
+            <SelectTrigger className="w-[140px] h-9 bg-card text-sm">
+              <SelectValue placeholder="全部操作" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部操作</SelectItem>
+              {receiptActions.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Table */}
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">运单号</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">操作类型</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">回单份数</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">快递单号</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">操作人</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">备注</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">操作时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">加载中...</td></tr>
+                ) : records.length === 0 ? (
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">暂无回单记录</td></tr>
+                ) : records.map(r => (
+                  <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-2.5">
+                      <span className="font-mono text-xs font-medium text-blue-600">{r.waybillNo}</span>
+                    </td>
+                    <td className="px-4 py-2.5"><ActionBadge action={r.action} /></td>
+                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-foreground">{r.receiptCount || '-'}</td>
+                    <td className="px-4 py-2.5 text-foreground text-xs">{r.expressNo || '-'}</td>
+                    <td className="px-4 py-2.5 text-foreground text-xs whitespace-nowrap">{r.operatorName}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground text-xs max-w-[150px] truncate" title={r.remark}>{r.remark || '-'}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground text-xs tabular-nums whitespace-nowrap">{r.createdAt?.replace('T', ' ').slice(0, 16)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* 分页 */}
+          {total > 20 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <span className="text-xs text-muted-foreground">第 {page} 页，共 {total} 条</span>
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
+                <Button size="sm" variant="outline" disabled={page * 20 >= total} onClick={() => setPage(page + 1)}>下一页</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 操作对话框 */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>回单{dialogAction}</DialogTitle>
+            <DialogDescription>
+              {dialogAction === '签收' && '登记回单签收，确认收到回单'}
+              {dialogAction === '寄出' && '登记回单寄出，填写快递单号'}
+              {dialogAction === '收到' && '确认收到寄回的回单'}
+              {dialogAction === '返厂' && '确认回单已返回发货方'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>运单ID <span className="text-red-500">*</span></Label>
+              <Input type="number" value={form.waybillId} onChange={e => setForm({ ...form, waybillId: e.target.value })}
+                placeholder="输入运单ID" className="mt-1.5" />
+            </div>
+            {dialogAction === '寄出' && (
+              <div>
+                <Label>快递单号</Label>
+                <Input value={form.expressNo} onChange={e => setForm({ ...form, expressNo: e.target.value })}
+                  placeholder="输入快递单号" className="mt-1.5" />
+              </div>
+            )}
+            <div>
+              <Label>备注</Label>
+              <Textarea value={form.remark} onChange={e => setForm({ ...form, remark: e.target.value })}
+                className="mt-1.5" rows={2} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
+            <Button onClick={handleSubmit} className={actionSubmitStyle(dialogAction)}>
+              确认{dialogAction}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
   );
+}
+
+function ActionBadge({ action }: { action: string }) {
+  const styles: Record<string, string> = {
+    '签收': 'bg-emerald-50 text-emerald-600',
+    '寄出': 'bg-blue-50 text-blue-600',
+    '收到': 'bg-purple-50 text-purple-600',
+    '返厂': 'bg-amber-50 text-amber-600',
+    '反签收': 'bg-red-50 text-red-600',
+    '反寄出': 'bg-red-50 text-red-600',
+  };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${styles[action] || 'bg-gray-100 text-gray-600'}`}>
+      {action}
+    </span>
+  );
+}
+
+function actionButtonStyle(action: string): string {
+  switch (action) {
+    case '签收': return 'bg-emerald-600 hover:bg-emerald-700 text-white';
+    case '寄出': return 'bg-blue-600 hover:bg-blue-700 text-white';
+    case '收到': return 'bg-purple-600 hover:bg-purple-700 text-white';
+    case '返厂': return 'bg-amber-600 hover:bg-amber-700 text-white';
+    default: return 'bg-gray-600 hover:bg-gray-700 text-white';
+  }
+}
+
+function actionSubmitStyle(action: string): string {
+  switch (action) {
+    case '签收': return 'bg-emerald-600 hover:bg-emerald-700 text-white';
+    case '寄出': return 'bg-blue-600 hover:bg-blue-700 text-white';
+    case '收到': return 'bg-purple-600 hover:bg-purple-700 text-white';
+    case '返厂': return 'bg-amber-600 hover:bg-amber-700 text-white';
+    default: return 'bg-blue-600 hover:bg-blue-700 text-white';
+  }
+}
+
+function actionIcon(action: string) {
+  const cls = "w-3.5 h-3.5 mr-1";
+  switch (action) {
+    case '签收': return <CheckCircle className={cls} />;
+    case '寄出': return <Send className={cls} />;
+    case '收到': return <Package className={cls} />;
+    case '返厂': return <RotateCcw className={cls} />;
+    default: return null;
+  }
+}
+
+function actionCountColor(action: string): string {
+  switch (action) {
+    case '签收': return 'text-emerald-600';
+    case '寄出': return 'text-blue-600';
+    case '收到': return 'text-purple-600';
+    case '返厂': return 'text-amber-600';
+    case '反签收': return 'text-red-600';
+    case '反寄出': return 'text-red-600';
+    default: return 'text-foreground';
+  }
 }

@@ -137,12 +137,12 @@ export const baseDataApi = {
     if (params.page) qs.set('page', String(params.page));
     if (params.size) qs.set('size', String(params.size));
     if (params.keyword) qs.set('keyword', params.keyword);
-    return request<PageResult<any>>(`/api/base/organizations?${qs.toString()}`);
+    return request<PageResult<any>>(`/api/organizations?${qs.toString()}`);
   },
-  allOrgs: () => request<any[]>('/api/base/organizations/all'),
-  createOrg: (data: any) => request<any>('/api/base/organizations', { method: 'POST', body: JSON.stringify(data) }),
-  updateOrg: (id: number, data: any) => request<void>(`/api/base/organizations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteOrg: (id: number) => request<void>(`/api/base/organizations/${id}`, { method: 'DELETE' }),
+  allOrgs: () => request<any[]>('/api/organizations/all'),
+  createOrg: (data: any) => request<any>('/api/organizations', { method: 'POST', body: JSON.stringify(data) }),
+  updateOrg: (id: number, data: any) => request<void>(`/api/organizations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteOrg: (id: number) => request<void>(`/api/organizations/${id}`, { method: 'DELETE' }),
 
   // 线路
   listRoutes: (params: { page?: number; size?: number; keyword?: string } = {}) => {
@@ -150,12 +150,12 @@ export const baseDataApi = {
     if (params.page) qs.set('page', String(params.page));
     if (params.size) qs.set('size', String(params.size));
     if (params.keyword) qs.set('keyword', params.keyword);
-    return request<PageResult<any>>(`/api/base/routes?${qs.toString()}`);
+    return request<PageResult<any>>(`/api/routes?${qs.toString()}`);
   },
-  allRoutes: () => request<any[]>('/api/base/routes/all'),
-  createRoute: (data: any) => request<any>('/api/base/routes', { method: 'POST', body: JSON.stringify(data) }),
-  updateRoute: (id: number, data: any) => request<void>(`/api/base/routes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteRoute: (id: number) => request<void>(`/api/base/routes/${id}`, { method: 'DELETE' }),
+  allRoutes: () => request<any[]>('/api/routes/all'),
+  createRoute: (data: any) => request<any>('/api/routes', { method: 'POST', body: JSON.stringify(data) }),
+  updateRoute: (id: number, data: any) => request<void>(`/api/routes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRoute: (id: number) => request<void>(`/api/routes/${id}`, { method: 'DELETE' }),
 
   // 车辆
   listVehicles: (params: { page?: number; size?: number; status?: string; keyword?: string } = {}) => {
@@ -164,12 +164,12 @@ export const baseDataApi = {
     if (params.size) qs.set('size', String(params.size));
     if (params.status) qs.set('status', params.status);
     if (params.keyword) qs.set('keyword', params.keyword);
-    return request<PageResult<any>>(`/api/base/vehicles?${qs.toString()}`);
+    return request<PageResult<any>>(`/api/vehicles?${qs.toString()}`);
   },
-  availableVehicles: () => request<any[]>('/api/base/vehicles/available'),
-  createVehicle: (data: any) => request<any>('/api/base/vehicles', { method: 'POST', body: JSON.stringify(data) }),
-  updateVehicle: (id: number, data: any) => request<void>(`/api/base/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteVehicle: (id: number) => request<void>(`/api/base/vehicles/${id}`, { method: 'DELETE' }),
+  availableVehicles: () => request<any[]>('/api/vehicles/available'),
+  createVehicle: (data: any) => request<any>('/api/vehicles', { method: 'POST', body: JSON.stringify(data) }),
+  updateVehicle: (id: number, data: any) => request<void>(`/api/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteVehicle: (id: number) => request<void>(`/api/vehicles/${id}`, { method: 'DELETE' }),
 
   // 客户
   listCustomers: (params: { page?: number; size?: number; keyword?: string } = {}) => {
@@ -177,11 +177,11 @@ export const baseDataApi = {
     if (params.page) qs.set('page', String(params.page));
     if (params.size) qs.set('size', String(params.size));
     if (params.keyword) qs.set('keyword', params.keyword);
-    return request<PageResult<any>>(`/api/base/customers?${qs.toString()}`);
+    return request<PageResult<any>>(`/api/customers?${qs.toString()}`);
   },
-  createCustomer: (data: any) => request<any>('/api/base/customers', { method: 'POST', body: JSON.stringify(data) }),
-  updateCustomer: (id: number, data: any) => request<void>(`/api/base/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteCustomer: (id: number) => request<void>(`/api/base/customers/${id}`, { method: 'DELETE' }),
+  createCustomer: (data: any) => request<any>('/api/customers', { method: 'POST', body: JSON.stringify(data) }),
+  updateCustomer: (id: number, data: any) => request<void>(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCustomer: (id: number) => request<void>(`/api/customers/${id}`, { method: 'DELETE' }),
 };
 
 // ==================== 财务 ====================
