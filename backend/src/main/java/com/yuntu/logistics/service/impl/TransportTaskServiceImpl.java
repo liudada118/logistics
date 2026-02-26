@@ -48,8 +48,8 @@ public class TransportTaskServiceImpl implements TransportTaskService {
 
         // 计算装载率（基于载重）
         BigDecimal loadRate = BigDecimal.ZERO;
-        if (vehicle.getCapacity() != null && vehicle.getCapacity().compareTo(BigDecimal.ZERO) > 0) {
-            loadRate = totalWeight.divide(vehicle.getCapacity(), 2, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
+        if (vehicle.getMaxWeight() != null && vehicle.getMaxWeight().compareTo(BigDecimal.ZERO) > 0) {
+            loadRate = totalWeight.divide(vehicle.getMaxWeight(), 2, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
         }
 
         // 创建运输任务

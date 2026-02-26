@@ -3,7 +3,7 @@
 // 当后端不可用时自动降级到 mock 数据
 // ============================================================
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? '' : 'http://localhost:8080');
 
 function getToken(): string | null {
   const user = localStorage.getItem('logistics_user');
