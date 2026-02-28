@@ -1,198 +1,90 @@
-// 基础资料 - 客户管理
-import { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import T9TablePage, { type Column, type FilterItem } from '@/components/T9TablePage';
+import T9Modal, { T9FormRow, T9Input, T9Select, T9Textarea, T9Button } from '@/components/T9Modal';
 import { baseDataApi } from '@/lib/api';
-import { mockCustomers, type Customer } from '@/lib/mock-data';
-import { Plus, Search, Pencil, Trash2, Users } from 'lucide-react';
-import { toast } from 'sonner';
-
-const customerTypes = ['发货客户', '收货客户', '双向客户'] as const;
+import { Edit, Trash2 } from 'lucide-react';
 
 export default function CustomerManage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [form, setForm] = useState({ name: '', phone: '', address: '', contactPerson: '', type: '发货客户' as Customer['type'], status: '正常' as Customer['status'] });
+  const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
+  const [form, setForm] = useState({ name: '', type: '散客', contact: '', phone: '', address: '', payMethod: '现付', creditLimit: '', remark: '' });
 
-  const loadData = useCallback(async () => {
+  useEffect(() => { loadData(); }, []);
+
+  const loadData = async () => {
     setLoading(true);
     try {
-      const res = await baseDataApi.listCustomers({ page: 1, size: 200, keyword: search || undefined });
-      setCustomers(res.records || []);
-    } catch {
-      setCustomers(mockCustomers);
-    } finally {
-      setLoading(false);
-    }
-  }, [search]);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  const filtered = customers.filter(c => {
-    const matchSearch = !search || c.name?.includes(search) || c.contactPerson?.includes(search) || c.phone?.includes(search);
-    const matchType = typeFilter === 'all' || c.type === typeFilter;
-    return matchSearch && matchType;
-  });
-
-  const openCreate = () => {
-    setEditingCustomer(null);
-    setForm({ name: '', phone: '', address: '', contactPerson: '', type: '发货客户', status: '正常' });
-    setDialogOpen(true);
+      const res = await baseDataApi.listCustomers({ page: 1, size: 50, keyword: filterValues.keyword });
+      setData(res.records || []);
+      setTotal(res.total || 0);
+    } catch { setData([]); } finally { setLoading(false); }
   };
 
-  const openEdit = (c: Customer) => {
-    setEditingCustomer(c);
-    setForm({ name: c.name, phone: c.phone, address: c.address, contactPerson: c.contactPerson, type: c.type, status: c.status });
-    setDialogOpen(true);
+  const openCreate = () => { setEditItem(null); setForm({ name: '', type: '散客', contact: '', phone: '', address: '', payMethod: '现付', creditLimit: '', remark: '' }); setShowModal(true); };
+  const openEdit = (item: any) => {
+    setEditItem(item);
+    setForm({ name: item.name || '', type: item.type || '散客', contact: item.contact || '', phone: item.phone || '', address: item.address || '', payMethod: item.payMethod || '现付', creditLimit: String(item.creditLimit || ''), remark: item.remark || '' });
+    setShowModal(true);
   };
 
   const handleSave = async () => {
-    if (!form.name) { toast.error('请填写客户名称'); return; }
+    if (!form.name) { alert('请填写客户名称'); return; }
     try {
-      if (editingCustomer) {
-        await baseDataApi.updateCustomer(editingCustomer.id, form);
-        toast.success('客户信息已更新');
-      } else {
-        await baseDataApi.createCustomer(form);
-        toast.success('客户创建成功');
-      }
-      setDialogOpen(false);
-      loadData();
-    } catch {
-      if (editingCustomer) {
-        setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? { ...c, ...form } : c));
-        toast.success('客户信息已更新');
-      } else {
-        const now = new Date().toISOString().slice(0, 10);
-        const newC: Customer = { id: Math.max(...customers.map(c => c.id), 0) + 1, ...form, createdAt: now };
-        setCustomers(prev => [...prev, newC]);
-        toast.success('客户创建成功');
-      }
-      setDialogOpen(false);
-    }
+      const payload = { ...form, creditLimit: parseFloat(form.creditLimit) || undefined };
+      if (editItem) { await baseDataApi.updateCustomer(editItem.id, payload); }
+      else { await baseDataApi.createCustomer(payload); }
+      setShowModal(false); loadData();
+    } catch (e: any) { alert(e.message || '保存失败'); }
   };
 
   const handleDelete = async (id: number) => {
-    try {
-      await baseDataApi.deleteCustomer(id);
-      toast.success('客户已删除');
-      loadData();
-    } catch {
-      setCustomers(prev => prev.filter(c => c.id !== id));
-      toast.success('客户已删除');
-    }
+    if (!confirm('确定要删除该客户吗？')) return;
+    try { await baseDataApi.deleteCustomer(id); loadData(); } catch (e: any) { alert(e.message || '删除失败'); }
   };
 
-  return (
-    <DashboardLayout>
-      <div className="p-4 lg:p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            <h1 className="text-lg font-bold text-foreground">客户管理</h1>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{filtered.length} 位</span>
-          </div>
-          <Button size="sm" onClick={openCreate}><Plus className="w-4 h-4 mr-1" />新增客户</Button>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="搜索客户名称/联系人/电话" className="pl-9 h-9" value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部类型</SelectItem>
-              {customerTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">客户名称</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">类型</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">联系人</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">电话</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">地址</th>
-                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">状态</th>
-                  <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">创建时间</th>
-                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">加载中...</td></tr>}
-                {!loading && filtered.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">暂无客户数据</td></tr>}
-                {!loading && filtered.map(c => (
-                  <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3 font-medium text-foreground">{c.name}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        c.type === '发货客户' ? 'bg-blue-100 text-blue-700' :
-                        c.type === '收货客户' ? 'bg-green-100 text-green-700' :
-                        'bg-purple-100 text-purple-700'
-                      }`}>{c.type}</span>
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">{c.contactPerson}</td>
-                    <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{c.phone}</td>
-                    <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell max-w-[200px] truncate">{c.address}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${c.status === '正常' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{c.status}</span>
-                    </td>
-                    <td className="px-4 py-3 text-center text-muted-foreground text-xs hidden sm:table-cell">{c.createdAt}</td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="w-3.5 h-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(c.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+  const columns: Column[] = [
+    { key: 'name', title: '客户名称', width: '150px', render: (v) => <span className="font-medium">{v || '-'}</span> },
+    { key: 'type', title: '客户类型', width: '80px', render: (v) => {
+      const c = v === '月结客户' ? 'text-blue-600' : v === 'VIP' ? 'text-purple-600' : 'text-gray-600';
+      return <span className={c}>{v || '-'}</span>;
+    }},
+    { key: 'contact', title: '联系人', width: '80px' },
+    { key: 'phone', title: '联系电话', width: '120px' },
+    { key: 'address', title: '地址', width: '200px', render: (v) => <span className="max-w-[200px] truncate block">{v || '-'}</span> },
+    { key: 'payMethod', title: '付款方式', width: '80px' },
+    { key: 'creditLimit', title: '信用额度', width: '90px', align: 'right', render: (v) => v ? `¥${Number(v).toLocaleString()}` : '-' },
+    { key: 'totalOrders', title: '总单量', width: '70px', align: 'right' },
+    { key: 'createTime', title: '创建时间', width: '140px', render: (v) => v || '-' },
+    { key: '_action', title: '操作', width: '100px', align: 'center', render: (_, row) => (
+      <div className="flex items-center justify-center gap-1">
+        <button onClick={() => openEdit(row)} className="text-blue-500 hover:text-blue-700 p-0.5"><Edit className="w-3.5 h-3.5" /></button>
+        <button onClick={() => handleDelete(row.id)} className="text-red-500 hover:text-red-700 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button>
       </div>
+    )},
+  ];
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>{editingCustomer ? '编辑客户' : '新增客户'}</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <div><label className="text-sm font-medium text-foreground">客户名称 *</label><Input className="mt-1" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-sm font-medium text-foreground">联系人</label><Input className="mt-1" value={form.contactPerson} onChange={e => setForm(f => ({ ...f, contactPerson: e.target.value }))} /></div>
-              <div><label className="text-sm font-medium text-foreground">联系电话</label><Input className="mt-1" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
-            </div>
-            <div><label className="text-sm font-medium text-foreground">地址</label><Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-sm font-medium text-foreground">客户类型</label>
-                <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v as Customer['type'] }))}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>{customerTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div><label className="text-sm font-medium text-foreground">状态</label>
-                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v as Customer['status'] }))}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="正常">正常</SelectItem><SelectItem value="停用">停用</SelectItem></SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button><Button onClick={handleSave}>保存</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </DashboardLayout>
+  const filters: FilterItem[] = [{ key: 'keyword', label: '关键字', type: 'text', placeholder: '客户名称/联系人/电话' }];
+
+  return (
+    <>
+      <T9TablePage title="客户管理" columns={columns} data={data} loading={loading} total={total}
+        filters={filters} filterValues={filterValues} onFilterChange={(k, v) => setFilterValues(prev => ({ ...prev, [k]: v }))}
+        onSearch={loadData} onRefresh={loadData} onAdd={openCreate} addLabel="新增客户" />
+      <T9Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? '编辑客户' : '新增客户'} width="500px"
+        footer={<><T9Button onClick={() => setShowModal(false)}>取消</T9Button><T9Button variant="primary" onClick={handleSave}>保存</T9Button></>}>
+        <T9FormRow label="客户名称" required><T9Input value={form.name} onChange={(e: any) => setForm(p => ({ ...p, name: e.target.value }))} placeholder="客户名称" /></T9FormRow>
+        <T9FormRow label="客户类型"><T9Select value={form.type} onChange={v => setForm(p => ({ ...p, type: v }))} options={[{ label: '散客', value: '散客' }, { label: '月结客户', value: '月结客户' }, { label: 'VIP', value: 'VIP' }, { label: '代理', value: '代理' }]} /></T9FormRow>
+        <T9FormRow label="联系人"><T9Input value={form.contact} onChange={(e: any) => setForm(p => ({ ...p, contact: e.target.value }))} placeholder="联系人" /></T9FormRow>
+        <T9FormRow label="联系电话"><T9Input value={form.phone} onChange={(e: any) => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="联系电话" /></T9FormRow>
+        <T9FormRow label="地址"><T9Input value={form.address} onChange={(e: any) => setForm(p => ({ ...p, address: e.target.value }))} placeholder="地址" /></T9FormRow>
+        <T9FormRow label="付款方式"><T9Select value={form.payMethod} onChange={v => setForm(p => ({ ...p, payMethod: v }))} options={[{ label: '现付', value: '现付' }, { label: '提付', value: '提付' }, { label: '月结', value: '月结' }]} /></T9FormRow>
+        <T9FormRow label="信用额度"><T9Input type="number" value={form.creditLimit} onChange={(e: any) => setForm(p => ({ ...p, creditLimit: e.target.value }))} placeholder="信用额度" /></T9FormRow>
+        <T9FormRow label="备注"><T9Textarea value={form.remark} onChange={(e: any) => setForm(p => ({ ...p, remark: e.target.value }))} placeholder="备注" /></T9FormRow>
+      </T9Modal>
+    </>
   );
 }

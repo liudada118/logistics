@@ -24,6 +24,7 @@ import OperationLogs from "./pages/OperationLogs";
 import SignManage from "./pages/SignManage";
 import ExceptionManage from "./pages/ExceptionManage";
 import ReceiptManage from "./pages/ReceiptManage";
+import Announcement from "./pages/Announcement";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated } = useAuth();
@@ -59,6 +60,7 @@ function Router() {
       <Route path="/users" component={() => <ProtectedRoute component={UserManage} />} />
       <Route path="/alerts" component={() => <ProtectedRoute component={AlertCenter} />} />
       <Route path="/logs" component={() => <ProtectedRoute component={OperationLogs} />} />
+      <Route path="/announcement" component={() => <ProtectedRoute component={Announcement} />} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

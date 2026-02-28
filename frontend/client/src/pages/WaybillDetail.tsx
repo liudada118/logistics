@@ -1,244 +1,168 @@
-import { useParams, useLocation } from 'wouter';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { useWaybills } from '@/contexts/WaybillContext';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Pencil, MailCheck, PackageCheck, Clock } from 'lucide-react';
-import { toast } from 'sonner';
+import { waybillApi } from '@/lib/api';
+import { useLocation, useRoute } from 'wouter';
+import { ArrowLeft, Printer, Edit, Truck, Package, MapPin, DollarSign, Clock, FileText } from 'lucide-react';
 
 export default function WaybillDetail() {
-  const params = useParams<{ id: string }>();
-  const { getWaybill, getStatusLogs, updateReceiptStatus } = useWaybills();
   const [, navigate] = useLocation();
+  const [match, params] = useRoute('/waybills/:id');
+  const id = match ? Number(params?.id) : null;
+  const [data, setData] = useState<any>(null);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const waybill = getWaybill(Number(params.id));
-  const logs = getStatusLogs(Number(params.id));
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    Promise.all([
+      waybillApi.get(id).catch(() => null),
+      waybillApi.getLogs(id).catch(() => []),
+    ]).then(([wb, lg]) => {
+      setData(wb);
+      setLogs(lg || []);
+    }).finally(() => setLoading(false));
+  }, [id]);
 
-  if (!waybill) {
-    return (
-      <DashboardLayout>
-        <div className="p-6 text-center text-muted-foreground">运单不存在</div>
-      </DashboardLayout>
-    );
-  }
-
-  const handleReceiptAction = (action: '已寄出' | '已签收') => {
-    updateReceiptStatus(waybill.id, action);
-    toast.success(`回单状态已更新为"${action}"`);
+  const statusColor = (status: string) => {
+    const map: Record<string, string> = { '已开单': 'bg-blue-100 text-blue-700', '已发货': 'bg-yellow-100 text-yellow-700', '运输中': 'bg-orange-100 text-orange-700', '已到货': 'bg-cyan-100 text-cyan-700', '已签收': 'bg-green-100 text-green-700', '异常': 'bg-red-100 text-red-700' };
+    return map[status] || 'bg-gray-100 text-gray-700';
   };
 
-  const statusStyles: Record<string, string> = {
-    '待调度': 'bg-slate-100 text-slate-600',
-    '已调度': 'bg-blue-50 text-blue-600',
-    '运输中': 'bg-amber-50 text-amber-600',
-    '已到货': 'bg-cyan-50 text-cyan-600',
-    '派送中': 'bg-indigo-50 text-indigo-600',
-    '已签收': 'bg-emerald-50 text-emerald-600',
-    '异常': 'bg-red-50 text-red-600',
-  };
-
-  // 计算费用明细
-  const baseFreight = Number(waybill.baseFreight || 0);
-  const insuranceFee = Number(waybill.insuranceFee || 0);
-  const pickupFee = Number(waybill.pickupFee || 0);
-  const deliveryFee = Number(waybill.deliveryFee || 0);
-  const packingFee = Number(waybill.packingFee || 0);
-  const otherFee = Number(waybill.otherFee || 0);
-  const totalFee = Number(waybill.freightFee || 0);
-  const codAmount = Number(waybill.codAmount || 0);
+  const InfoRow = ({ label, value }: { label: string; value: any }) => (
+    <div className="flex items-start py-1.5 border-b border-gray-100 last:border-0">
+      <span className="w-20 text-xs text-gray-500 shrink-0">{label}</span>
+      <span className="text-xs text-gray-800 flex-1">{value ?? '-'}</span>
+    </div>
+  );
 
   return (
     <DashboardLayout>
-      <div className="p-4 lg:p-6 max-w-5xl space-y-5">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/waybills')} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
-              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-foreground font-mono" style={{ fontFamily: 'DM Sans' }}>{waybill.waybillNo}</h1>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyles[waybill.status] || 'bg-gray-100 text-gray-600'}`}>
-                  {waybill.status}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-0.5">创建于 {waybill.createdAt}</p>
-            </div>
-          </div>
+      <div className="flex flex-col h-full bg-[#f0f2f5]">
+        <div className="px-3 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {waybill.receiptStatus === '待寄出' && (
-              <Button variant="outline" size="sm" onClick={() => handleReceiptAction('已寄出')} className="text-blue-600 border-blue-200 hover:bg-blue-50">
-                <MailCheck className="w-4 h-4 mr-1.5" />回单已寄出
-              </Button>
-            )}
-            {waybill.receiptStatus === '已寄出' && (
-              <Button variant="outline" size="sm" onClick={() => handleReceiptAction('已签收')} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50">
-                <PackageCheck className="w-4 h-4 mr-1.5" />回单已签收
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={() => navigate(`/waybills/${waybill.id}/edit`)}>
-              <Pencil className="w-4 h-4 mr-1.5" />编辑
-            </Button>
+            <button onClick={() => navigate('/waybills')} className="h-7 px-2 text-xs bg-white text-gray-600 rounded border border-gray-300 hover:bg-gray-50 flex items-center gap-1">
+              <ArrowLeft className="w-3 h-3" />返回
+            </button>
+            <h2 className="text-sm font-bold text-gray-800">运单详情</h2>
+            {data && <span className={`text-xs px-2 py-0.5 rounded ${statusColor(data.status)}`}>{data.status}</span>}
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => navigate(`/waybills/${id}/edit`)} className="h-7 px-3 text-xs bg-white text-gray-600 rounded border border-gray-300 hover:bg-gray-50 flex items-center gap-1">
+              <Edit className="w-3 h-3" />编辑
+            </button>
+            <button className="h-7 px-3 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1">
+              <Printer className="w-3 h-3" />打印运单
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Left column - details */}
-          <div className="lg:col-span-2 space-y-5">
-            {/* 站点信息 */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">站点信息</h3>
-              <div className="flex items-center gap-3 text-sm">
-                <div className="flex-1 text-center">
-                  <div className="text-xs text-muted-foreground">发站</div>
-                  <div className="font-medium text-foreground mt-0.5">{waybill.originOrgName || waybill.currentOrgName || '-'}</div>
+        <div className="flex-1 mx-3 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-full text-gray-400 text-sm">加载中...</div>
+          ) : !data ? (
+            <div className="flex items-center justify-center h-full text-gray-400 text-sm">运单不存在</div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              {/* 运单基本信息 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-blue-500" />运单信息
                 </div>
-                {waybill.transitOrgName && (
-                  <>
-                    <div className="text-muted-foreground">→</div>
-                    <div className="flex-1 text-center">
-                      <div className="text-xs text-muted-foreground">中转</div>
-                      <div className="font-medium text-amber-600 mt-0.5">{waybill.transitOrgName}</div>
-                    </div>
-                  </>
-                )}
-                <div className="text-muted-foreground">→</div>
-                <div className="flex-1 text-center">
-                  <div className="text-xs text-muted-foreground">到站</div>
-                  <div className="font-medium text-foreground mt-0.5">{waybill.destOrgName || '-'}</div>
+                <div className="px-3 py-1">
+                  <InfoRow label="运单号" value={<span className="font-mono font-medium text-blue-600">{data.waybillNo}</span>} />
+                  <InfoRow label="货号" value={data.goodsNo} />
+                  <InfoRow label="状态" value={<span className={`text-xs px-1.5 py-0.5 rounded ${statusColor(data.status)}`}>{data.status}</span>} />
+                  <InfoRow label="开单时间" value={data.createTime} />
+                  <InfoRow label="付款方式" value={data.payMethod} />
                 </div>
               </div>
-            </div>
 
-            {/* Sender & Receiver */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="bg-card border border-border rounded-lg p-4">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">发货信息</h3>
-                <div className="space-y-2.5">
-                  <InfoRow label="发货方" value={waybill.senderName} />
-                  <InfoRow label="联系电话" value={waybill.senderPhone} />
-                  <InfoRow label="发货地址" value={waybill.senderAddress} />
+              {/* 发货信息 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-green-500" />发货信息
+                </div>
+                <div className="px-3 py-1">
+                  <InfoRow label="发站" value={data.senderOrgName || data.originName} />
+                  <InfoRow label="发货人" value={data.senderName} />
+                  <InfoRow label="电话" value={data.senderPhone} />
+                  <InfoRow label="地址" value={data.senderAddress} />
                 </div>
               </div>
-              <div className="bg-card border border-border rounded-lg p-4">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">收货信息</h3>
-                <div className="space-y-2.5">
-                  <InfoRow label="收货人" value={waybill.receiverName} />
-                  <InfoRow label="联系电话" value={waybill.receiverPhone} />
-                  <InfoRow label="收货地址" value={waybill.receiverAddress} />
-                  <InfoRow label="交接方式" value={waybill.deliveryMethod || '自提'} />
+
+              {/* 收货信息 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-red-500" />收货信息
+                </div>
+                <div className="px-3 py-1">
+                  <InfoRow label="到站" value={data.receiverOrgName || data.destName} />
+                  <InfoRow label="收货人" value={data.receiverName} />
+                  <InfoRow label="电话" value={data.receiverPhone} />
+                  <InfoRow label="地址" value={data.receiverAddress} />
                 </div>
               </div>
-            </div>
 
-            {/* Goods info */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">货物信息</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <InfoBlock label="货物名称" value={waybill.goodsName} />
-                <InfoBlock label="包装类型" value={waybill.packingType || '-'} />
-                <InfoBlock label="件数" value={`${waybill.quantity} 件`} />
-                <InfoBlock label="重量" value={`${waybill.weight} kg`} />
-                <InfoBlock label="体积" value={`${waybill.volume} m³`} />
-              </div>
-            </div>
-
-            {/* 费用明细 */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">费用明细</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <InfoBlock label="付款方式" value={waybill.paymentMethod} />
-                <InfoBlock label="基本运费" value={`¥${baseFreight.toFixed(2)}`} />
-                <InfoBlock label="保险费" value={`¥${insuranceFee.toFixed(2)}`} />
-                <InfoBlock label="接货费" value={`¥${pickupFee.toFixed(2)}`} />
-                <InfoBlock label="送货费" value={`¥${deliveryFee.toFixed(2)}`} />
-                <InfoBlock label="包装费" value={`¥${packingFee.toFixed(2)}`} />
-                <InfoBlock label="其他费用" value={`¥${otherFee.toFixed(2)}`} />
-                <InfoBlock label="总运费" value={`¥${totalFee.toFixed(2)}`} highlight />
-              </div>
-              {codAmount > 0 && (
-                <div className="border-t border-border mt-4 pt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <InfoBlock label="代收货款" value={`¥${codAmount.toFixed(2)}`} highlight />
+              {/* 货物信息 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-orange-500" />货物信息
                 </div>
-              )}
-            </div>
-
-            {/* 回单信息 */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">回单信息</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <InfoBlock label="回单状态" value={waybill.receiptStatus || '无需回单'} />
-                <InfoBlock label="是否需要回单" value={waybill.receiptRequired ? '是' : '否'} />
-                {(waybill.receiptRequired ?? 0) > 0 && (
-                  <InfoBlock label="回单份数" value={`${waybill.receiptCount || 0} 份`} />
-                )}
-                <InfoBlock label="当前位置" value={waybill.currentOrgName || '-'} />
+                <div className="px-3 py-1">
+                  <InfoRow label="品名" value={data.goodsName} />
+                  <InfoRow label="件数" value={data.quantity} />
+                  <InfoRow label="重量" value={data.weight ? `${data.weight} kg` : '-'} />
+                  <InfoRow label="体积" value={data.volume ? `${data.volume} m³` : '-'} />
+                </div>
               </div>
-            </div>
 
-            {/* Remark */}
-            {waybill.remark && (
-              <div className="bg-card border border-border rounded-lg p-4">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">备注</h3>
-                <p className="text-sm text-foreground">{waybill.remark}</p>
+              {/* 费用信息 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-yellow-500" />费用信息
+                </div>
+                <div className="px-3 py-1">
+                  <InfoRow label="运费" value={data.freight ? `¥${data.freight}` : '-'} />
+                  <InfoRow label="送货费" value={data.deliveryFee ? `¥${data.deliveryFee}` : '-'} />
+                  <InfoRow label="保价费" value={data.insuranceFee ? `¥${data.insuranceFee}` : '-'} />
+                  <InfoRow label="包装费" value={data.packingFee ? `¥${data.packingFee}` : '-'} />
+                  <InfoRow label="费用合计" value={<span className="font-bold text-red-600">¥{data.totalFee || data.freight || 0}</span>} />
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Right column - timeline */}
-          <div className="lg:col-span-1">
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">状态追踪</h3>
-              {logs.length > 0 ? (
-                <div className="space-y-0">
-                  {logs.map((log, index) => (
-                    <div key={log.id} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 ${index === logs.length - 1 ? 'bg-blue-500' : 'bg-border'}`} />
-                        {index < logs.length - 1 && <div className="w-px flex-1 bg-border my-1" />}
-                      </div>
-                      <div className="pb-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm font-medium ${index === logs.length - 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
-                            {log.status}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{log.description}</p>
-                        <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground/60">
-                          <Clock className="w-3 h-3" />
-                          <span className="tabular-nums">{log.createdAt}</span>
-                          <span>·</span>
-                          <span>{log.operatorName}</span>
-                        </div>
+              {/* 操作日志 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-purple-500" />操作记录
+                </div>
+                <div className="px-3 py-1 max-h-48 overflow-y-auto">
+                  {logs.length === 0 ? (
+                    <div className="text-xs text-gray-400 py-4 text-center">暂无操作记录</div>
+                  ) : logs.map((log, i) => (
+                    <div key={i} className="flex items-start gap-2 py-1.5 border-b border-gray-100 last:border-0">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                      <div className="flex-1">
+                        <div className="text-xs text-gray-800">{log.action || log.description}</div>
+                        <div className="text-[10px] text-gray-400">{log.operatorName} · {log.createTime}</div>
                       </div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">暂无状态记录</p>
+              </div>
+
+              {/* 备注 */}
+              {data.remark && (
+                <div className="col-span-3 bg-white rounded border border-gray-200">
+                  <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700">备注</div>
+                  <div className="px-3 py-2 text-xs text-gray-700">{data.remark}</div>
+                </div>
               )}
             </div>
-          </div>
+          )}
+          <div className="h-3" />
         </div>
       </div>
     </DashboardLayout>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start gap-2">
-      <span className="text-xs text-muted-foreground shrink-0 w-16">{label}</span>
-      <span className="text-sm text-foreground">{value || '-'}</span>
-    </div>
-  );
-}
-
-function InfoBlock({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-sm mt-0.5 ${highlight ? 'font-semibold text-blue-600 tabular-nums' : 'text-foreground'}`}>{value}</p>
-    </div>
   );
 }

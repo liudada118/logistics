@@ -1,312 +1,106 @@
-// 系统管理 - 用户管理
-import { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { userApi, baseDataApi } from '@/lib/api';
-import { Plus, Search, Pencil, Trash2, KeyRound, Users, Shield, ShieldCheck, Briefcase } from 'lucide-react';
-import { toast } from 'sonner';
-
-const roleOptions = [
-  { value: 'admin', label: '管理员', icon: ShieldCheck },
-  { value: 'operator', label: '操作员', icon: Briefcase },
-  { value: 'finance', label: '财务', icon: Shield },
-];
-
-const roleColor: Record<string, string> = {
-  admin: 'bg-red-100 text-red-700',
-  operator: 'bg-blue-100 text-blue-700',
-  finance: 'bg-emerald-100 text-emerald-700',
-};
-
-const roleLabel: Record<string, string> = {
-  admin: '管理员',
-  operator: '操作员',
-  finance: '财务',
-};
+import { useState, useEffect } from 'react';
+import T9TablePage, { type Column, type FilterItem } from '@/components/T9TablePage';
+import T9Modal, { T9FormRow, T9Input, T9Select, T9Button } from '@/components/T9Modal';
+import { userApi } from '@/lib/api';
+import { Edit, Trash2, Lock } from 'lucide-react';
 
 export default function UserManage() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [loading, setLoading] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
-  const [orgs, setOrgs] = useState<any[]>([]);
-  const [form, setForm] = useState({ username: '', fullName: '', phone: '', role: 'operator', orgId: 0, password: '' });
-  const [resetDialog, setResetDialog] = useState<{ open: boolean; userId: number; username: string }>({ open: false, userId: 0, username: '' });
-  const [newPassword, setNewPassword] = useState('123456');
-  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
+  const [form, setForm] = useState({ username: '', password: '', fullName: '', role: 'operator', phone: '', email: '', status: '正常' });
 
-  const fetchUsers = useCallback(async () => {
+  useEffect(() => { loadData(); }, []);
+
+  const loadData = async () => {
     setLoading(true);
     try {
-      const result = await userApi.list({
-        page,
-        size: 20,
-        role: roleFilter !== 'all' ? roleFilter : undefined,
-        keyword: search || undefined,
-      });
-      setUsers(result.records);
-      setTotal(result.total);
-    } catch (e: any) {
-      toast.error('加载失败: ' + e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, roleFilter, search]);
-
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
-
-  useEffect(() => {
-    baseDataApi.allOrgs().then(setOrgs).catch(() => {});
-  }, []);
-
-  const openCreate = () => {
-    setEditingUser(null);
-    setForm({ username: '', fullName: '', phone: '', role: 'operator', orgId: 0, password: '123456' });
-    setDialogOpen(true);
+      const res = await userApi.list({ page: 1, size: 50, keyword: filterValues.keyword, role: filterValues.role });
+      setData(res.records || []);
+      setTotal(res.total || 0);
+    } catch { setData([]); } finally { setLoading(false); }
   };
 
-  const openEdit = (user: any) => {
-    setEditingUser(user);
-    setForm({ username: user.username, fullName: user.fullName || '', phone: user.phone || '', role: user.role, orgId: user.orgId || 0, password: '' });
-    setDialogOpen(true);
+  const openCreate = () => { setEditItem(null); setForm({ username: '', password: '', fullName: '', role: 'operator', phone: '', email: '', status: '正常' }); setShowModal(true); };
+  const openEdit = (item: any) => {
+    setEditItem(item);
+    setForm({ username: item.username || '', password: '', fullName: item.fullName || '', role: item.role || 'operator', phone: item.phone || '', email: item.email || '', status: item.status || '正常' });
+    setShowModal(true);
   };
 
   const handleSave = async () => {
-    if (!form.username.trim() || !form.fullName.trim()) {
-      toast.error('用户名和姓名不能为空');
-      return;
-    }
+    if (!form.username || !form.fullName) { alert('请填写用户名和姓名'); return; }
+    if (!editItem && !form.password) { alert('请填写密码'); return; }
     try {
-      if (editingUser) {
-        await userApi.update(editingUser.id, {
-          fullName: form.fullName,
-          phone: form.phone,
-          role: form.role,
-          orgId: form.orgId || null,
-        });
-        toast.success('更新成功');
-      } else {
-        await userApi.create({
-          username: form.username,
-          fullName: form.fullName,
-          phone: form.phone,
-          role: form.role,
-          orgId: form.orgId || null,
-          password: form.password || '123456',
-        });
-        toast.success('创建成功');
-      }
-      setDialogOpen(false);
-      fetchUsers();
-    } catch (e: any) {
-      toast.error(e.message);
-    }
+      if (editItem) { await userApi.update(editItem.id, form); }
+      else { await userApi.create(form); }
+      setShowModal(false); loadData();
+    } catch (e: any) { alert(e.message || '保存失败'); }
   };
 
-  const handleResetPassword = async () => {
-    try {
-      await userApi.resetPassword(resetDialog.userId, newPassword);
-      toast.success('密码重置成功');
-      setResetDialog({ open: false, userId: 0, username: '' });
-    } catch (e: any) {
-      toast.error(e.message);
-    }
+  const handleDelete = async (id: number) => {
+    if (!confirm('确定要删除该用户吗？')) return;
+    try { await userApi.delete(id); loadData(); } catch (e: any) { alert(e.message || '删除失败'); }
   };
 
-  const handleDelete = async () => {
-    if (deleteId === null) return;
-    try {
-      await userApi.delete(deleteId);
-      toast.success('删除成功');
-      setDeleteId(null);
-      fetchUsers();
-    } catch (e: any) {
-      toast.error(e.message);
-    }
+  const handleResetPwd = async (id: number) => {
+    if (!confirm('确定要重置密码为123456吗？')) return;
+    try { await userApi.resetPassword(id, '123456'); alert('密码已重置为123456'); } catch (e: any) { alert(e.message || '操作失败'); }
   };
+
+  const roleLabel = (role: string) => {
+    const map: Record<string, string> = { admin: '系统管理员', operator: '操作员', finance: '财务', driver: '司机', customer: '客户' };
+    return map[role] || role;
+  };
+
+  const columns: Column[] = [
+    { key: 'username', title: '用户名', width: '100px', render: (v) => <span className="font-medium">{v || '-'}</span> },
+    { key: 'fullName', title: '姓名', width: '80px' },
+    { key: 'role', title: '角色', width: '100px', render: (v) => {
+      const c = v === 'admin' ? 'text-red-600' : v === 'finance' ? 'text-purple-600' : 'text-blue-600';
+      return <span className={c}>{roleLabel(v)}</span>;
+    }},
+    { key: 'phone', title: '电话', width: '120px' },
+    { key: 'email', title: '邮箱', width: '160px' },
+    { key: 'orgName', title: '所属网点', width: '100px' },
+    { key: 'status', title: '状态', width: '70px', render: (v) => <span className={v === '正常' ? 'text-green-600' : 'text-red-600'}>{v || '-'}</span> },
+    { key: 'lastLoginTime', title: '最后登录', width: '140px', render: (v) => v || '-' },
+    { key: 'createTime', title: '创建时间', width: '140px', render: (v) => v || '-' },
+    { key: '_action', title: '操作', width: '130px', align: 'center', render: (_, row) => (
+      <div className="flex items-center justify-center gap-1">
+        <button onClick={() => openEdit(row)} className="text-blue-500 hover:text-blue-700 p-0.5" title="编辑"><Edit className="w-3.5 h-3.5" /></button>
+        <button onClick={() => handleResetPwd(row.id)} className="text-orange-500 hover:text-orange-700 p-0.5" title="重置密码"><Lock className="w-3.5 h-3.5" /></button>
+        <button onClick={() => handleDelete(row.id)} className="text-red-500 hover:text-red-700 p-0.5" title="删除"><Trash2 className="w-3.5 h-3.5" /></button>
+      </div>
+    )},
+  ];
+
+  const filters: FilterItem[] = [
+    { key: 'keyword', label: '关键字', type: 'text', placeholder: '用户名/姓名/电话' },
+    { key: 'role', label: '角色', type: 'select', options: [
+      { label: '管理员', value: 'admin' }, { label: '操作员', value: 'operator' },
+      { label: '财务', value: 'finance' }, { label: '司机', value: 'driver' },
+    ]},
+  ];
 
   return (
-    <DashboardLayout>
-      <div className="p-4 lg:p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            <h1 className="text-lg font-bold text-foreground">用户管理</h1>
-          </div>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="w-4 h-4 mr-1" />新增用户
-          </Button>
-        </div>
-
-        {/* 筛选栏 */}
-        <div className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="搜索用户名/姓名/手机号..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="pl-9 h-9" />
-          </div>
-          <Select value={roleFilter} onValueChange={v => { setRoleFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="角色" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部角色</SelectItem>
-              {roleOptions.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* 表格 */}
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">用户名</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">姓名</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">手机号</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">角色</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">所属网点</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">状态</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {users.map(u => (
-                  <tr key={u.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 font-medium">{u.username}</td>
-                    <td className="px-4 py-2.5">{u.fullName}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground tabular-nums">{u.phone || '-'}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${roleColor[u.role] || 'bg-gray-100 text-gray-600'}`}>
-                        {roleLabel[u.role] || u.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground text-xs">{u.orgName || '-'}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${u.status === 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                        {u.status === 1 ? '正常' : '停用'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => openEdit(u)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="编辑">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setResetDialog({ open: true, userId: u.id, username: u.username })} className="p-1.5 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors" title="重置密码">
-                          <KeyRound className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setDeleteId(u.id)} className="p-1.5 rounded hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors" title="删除">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {users.length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">{loading ? '加载中...' : '暂无用户数据'}</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {total > 20 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-              <span className="text-xs text-muted-foreground">共 {total} 条</span>
-              <div className="flex gap-1">
-                <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>上一页</Button>
-                <Button size="sm" variant="outline" disabled={page * 20 >= total} onClick={() => setPage(p => p + 1)}>下一页</Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 创建/编辑对话框 */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingUser ? '编辑用户' : '新增用户'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="text-sm font-medium text-foreground">用户名</label>
-              <Input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} disabled={!!editingUser} className="mt-1" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">姓名</label>
-              <Input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">手机号</label>
-              <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">角色</label>
-              <Select value={form.role} onValueChange={v => setForm({ ...form, role: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {roleOptions.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">所属网点</label>
-              <Select value={String(form.orgId)} onValueChange={v => setForm({ ...form, orgId: Number(v) })}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="选择网点" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">无</SelectItem>
-                  {orgs.map(o => <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {!editingUser && (
-              <div>
-                <label className="text-sm font-medium text-foreground">初始密码</label>
-                <Input value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="默认 123456" className="mt-1" />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSave}>{editingUser ? '保存' : '创建'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 重置密码对话框 */}
-      <Dialog open={resetDialog.open} onOpenChange={() => setResetDialog({ open: false, userId: 0, username: '' })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>重置密码 - {resetDialog.username}</DialogTitle>
-          </DialogHeader>
-          <div className="py-2">
-            <label className="text-sm font-medium text-foreground">新密码</label>
-            <Input value={newPassword} onChange={e => setNewPassword(e.target.value)} className="mt-1" />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setResetDialog({ open: false, userId: 0, username: '' })}>取消</Button>
-            <Button onClick={handleResetPassword}>确认重置</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 删除确认 */}
-      <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">此操作不可撤销，确定要删除该用户吗？</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>取消</Button>
-            <Button variant="destructive" onClick={handleDelete}>确认删除</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </DashboardLayout>
+    <>
+      <T9TablePage title="用户管理" columns={columns} data={data} loading={loading} total={total}
+        filters={filters} filterValues={filterValues} onFilterChange={(k, v) => setFilterValues(prev => ({ ...prev, [k]: v }))}
+        onSearch={loadData} onRefresh={loadData} onAdd={openCreate} addLabel="新增用户" />
+      <T9Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? '编辑用户' : '新增用户'} width="500px"
+        footer={<><T9Button onClick={() => setShowModal(false)}>取消</T9Button><T9Button variant="primary" onClick={handleSave}>保存</T9Button></>}>
+        <T9FormRow label="用户名" required><T9Input value={form.username} onChange={(e: any) => setForm(p => ({ ...p, username: e.target.value }))} placeholder="用户名" disabled={!!editItem} /></T9FormRow>
+        {!editItem && <T9FormRow label="密码" required><T9Input type="password" value={form.password} onChange={(e: any) => setForm(p => ({ ...p, password: e.target.value }))} placeholder="密码" /></T9FormRow>}
+        <T9FormRow label="姓名" required><T9Input value={form.fullName} onChange={(e: any) => setForm(p => ({ ...p, fullName: e.target.value }))} placeholder="姓名" /></T9FormRow>
+        <T9FormRow label="角色"><T9Select value={form.role} onChange={v => setForm(p => ({ ...p, role: v }))} options={[{ label: '管理员', value: 'admin' }, { label: '操作员', value: 'operator' }, { label: '财务', value: 'finance' }, { label: '司机', value: 'driver' }]} /></T9FormRow>
+        <T9FormRow label="电话"><T9Input value={form.phone} onChange={(e: any) => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="电话" /></T9FormRow>
+        <T9FormRow label="邮箱"><T9Input value={form.email} onChange={(e: any) => setForm(p => ({ ...p, email: e.target.value }))} placeholder="邮箱" /></T9FormRow>
+        <T9FormRow label="状态"><T9Select value={form.status} onChange={v => setForm(p => ({ ...p, status: v }))} options={[{ label: '正常', value: '正常' }, { label: '停用', value: '停用' }]} /></T9FormRow>
+      </T9Modal>
+    </>
   );
 }

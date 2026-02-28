@@ -303,6 +303,8 @@ export const alertApi = {
   stats: () => request<{ unhandled: number; total: number }>('/api/alerts/stats'),
   handle: (id: number) => request<void>(`/api/alerts/${id}/handle`, { method: 'PUT' }),
   ignore: (id: number) => request<void>(`/api/alerts/${id}/ignore`, { method: 'PUT' }),
+  read: (id: number) => request<void>(`/api/alerts/${id}/read`, { method: 'PUT' }),
+  batchRead: (ids: number[]) => request<void>('/api/alerts/batch-read', { method: 'PUT', body: JSON.stringify({ ids }) }),
 };
 
 // ==================== 操作日志 ====================

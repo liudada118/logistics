@@ -1,390 +1,207 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useParams } from 'wouter';
 import DashboardLayout from '@/components/DashboardLayout';
-import { useWaybills } from '@/contexts/WaybillContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { ArrowLeft, Save } from 'lucide-react';
-import { toast } from 'sonner';
-import { baseDataApi } from '@/lib/api';
-
-const paymentMethods = ['现付', '提付', '回单付', '月结', '货款扣'];
-const packingTypes = ['纸箱', '木箱', '编织袋', '泡沫箱', '铁架', '裸装', '其他'];
-const deliveryMethods = ['自提', '送货上门', '代理中转'];
+import { waybillApi, baseDataApi } from '@/lib/api';
+import { useLocation, useRoute } from 'wouter';
+import { Save, RotateCcw, Printer, ArrowLeft } from 'lucide-react';
 
 export default function WaybillForm() {
-  const params = useParams<{ id: string }>();
-  const isEdit = !!params.id;
-  const { getWaybill, createWaybill, updateWaybill } = useWaybills();
   const [, navigate] = useLocation();
+  const [matchEdit, paramsEdit] = useRoute('/waybills/:id/edit');
+  const editId = matchEdit ? Number(paramsEdit?.id) : null;
+  const isEdit = !!editId;
+
   const [orgs, setOrgs] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
-    senderCustomerId: 0,
-    senderName: '',
-    senderPhone: '',
-    senderAddress: '',
-    receiverName: '',
-    receiverPhone: '',
-    receiverAddress: '',
-    originOrgId: 0,
-    originOrgName: '',
-    transitOrgId: 0,
-    transitOrgName: '',
-    destOrgId: 0,
-    destOrgName: '',
-    goodsName: '',
-    packingType: '纸箱',
-    quantity: 1,
-    weight: 0,
-    volume: 0,
-    paymentMethod: '现付',
-    freightFee: 0,
-    baseFreight: 0,
-    insuranceFee: 0,
-    pickupFee: 0,
-    deliveryFee: 0,
-    packingFee: 0,
-    otherFee: 0,
-    codAmount: 0,
-    receiptRequired: 0,
-    receiptCount: 0,
-    deliveryMethod: '自提',
+    senderName: '', senderPhone: '', senderAddress: '',
+    receiverName: '', receiverPhone: '', receiverAddress: '',
+    originId: '', destId: '',
+    goodsName: '', goodsNo: '', quantity: '1', weight: '', volume: '',
+    freight: '', deliveryFee: '', insuranceFee: '', packingFee: '', otherFee: '',
+    payMethod: '现付',
     remark: '',
   });
 
-  // 自动计算总运费
-  const totalFee = form.baseFreight + form.insuranceFee + form.pickupFee + form.deliveryFee + form.packingFee + form.otherFee;
-
   useEffect(() => {
-    setForm(prev => ({ ...prev, freightFee: totalFee }));
-  }, [totalFee]);
-
-  // 加载网点和客户列表
-  useEffect(() => {
-    baseDataApi.allOrgs().then(setOrgs).catch(() => setOrgs([]));
-    baseDataApi.listCustomers({ page: 1, size: 1000 }).then(r => setCustomers(r.records || [])).catch(() => setCustomers([]));
-  }, []);
-
-  useEffect(() => {
-    if (isEdit && params.id) {
-      const wb = getWaybill(Number(params.id));
-      if (wb) {
+    baseDataApi.allOrgs().then(setOrgs).catch(() => {});
+    if (editId) {
+      setLoading(true);
+      waybillApi.get(editId).then(data => {
         setForm({
-          senderCustomerId: wb.senderCustomerId || 0,
-          senderName: wb.senderName || '',
-          senderPhone: wb.senderPhone || '',
-          senderAddress: wb.senderAddress || '',
-          receiverName: wb.receiverName || '',
-          receiverPhone: wb.receiverPhone || '',
-          receiverAddress: wb.receiverAddress || '',
-          originOrgId: wb.originOrgId || 0,
-          originOrgName: wb.originOrgName || '',
-          transitOrgId: wb.transitOrgId || 0,
-          transitOrgName: wb.transitOrgName || '',
-          destOrgId: wb.destOrgId || 0,
-          destOrgName: wb.destOrgName || '',
-          goodsName: wb.goodsName || '',
-          packingType: wb.packingType || '纸箱',
-          quantity: wb.quantity || 1,
-          weight: wb.weight || 0,
-          volume: wb.volume || 0,
-          paymentMethod: wb.paymentMethod || '现付',
-          freightFee: wb.freightFee || 0,
-          baseFreight: wb.baseFreight || 0,
-          insuranceFee: wb.insuranceFee || 0,
-          pickupFee: wb.pickupFee || 0,
-          deliveryFee: wb.deliveryFee || 0,
-          packingFee: wb.packingFee || 0,
-          otherFee: wb.otherFee || 0,
-          codAmount: wb.codAmount || 0,
-          receiptRequired: wb.receiptRequired || 0,
-          receiptCount: wb.receiptCount || 0,
-          deliveryMethod: wb.deliveryMethod || '自提',
-          remark: wb.remark || '',
+          senderName: data.senderName || '', senderPhone: data.senderPhone || '', senderAddress: data.senderAddress || '',
+          receiverName: data.receiverName || '', receiverPhone: data.receiverPhone || '', receiverAddress: data.receiverAddress || '',
+          originId: String(data.originId || ''), destId: String(data.destId || ''),
+          goodsName: data.goodsName || '', goodsNo: data.goodsNo || '', quantity: String(data.quantity || 1),
+          weight: String(data.weight || ''), volume: String(data.volume || ''),
+          freight: String(data.freight || ''), deliveryFee: String(data.deliveryFee || ''),
+          insuranceFee: String(data.insuranceFee || ''), packingFee: String(data.packingFee || ''),
+          otherFee: String(data.otherFee || ''), payMethod: data.payMethod || '现付', remark: data.remark || '',
         });
-      }
+      }).catch(console.error).finally(() => setLoading(false));
     }
-  }, [isEdit, params.id, getWaybill]);
+  }, [editId]);
 
-  const handleCustomerChange = (customerId: string) => {
-    const customer = customers.find(c => c.id === Number(customerId));
-    if (customer) {
-      setForm(prev => ({
-        ...prev,
-        senderCustomerId: customer.id,
-        senderName: customer.name,
-        senderPhone: customer.phone || customer.contactPhone || '',
-        senderAddress: customer.address || '',
-      }));
-    }
-  };
+  const setField = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
 
-  const handleOrgChange = (field: 'originOrgId' | 'transitOrgId' | 'destOrgId', orgId: string) => {
-    const org = orgs.find(o => o.id === Number(orgId));
-    const nameField = field.replace('Id', 'Name') as 'originOrgName' | 'transitOrgName' | 'destOrgName';
-    setForm(prev => ({
-      ...prev,
-      [field]: Number(orgId),
-      [nameField]: org?.name || '',
-    }));
-  };
+  const totalFee = [form.freight, form.deliveryFee, form.insuranceFee, form.packingFee, form.otherFee]
+    .reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.senderName || !form.receiverName || !form.goodsName) {
-      toast.error('请填写必填字段：发货方、收货人、货物名称');
-      return;
-    }
-
+  const handleSubmit = async () => {
+    if (!form.senderName || !form.receiverName) { alert('请填写发货人和收货人信息'); return; }
+    setSaving(true);
     try {
-      if (isEdit && params.id) {
-        await updateWaybill(Number(params.id), form);
-        toast.success('运单已更新');
-        navigate(`/waybills/${params.id}`);
+      const payload = {
+        ...form,
+        originId: form.originId ? Number(form.originId) : undefined,
+        destId: form.destId ? Number(form.destId) : undefined,
+        quantity: Number(form.quantity) || 1,
+        weight: parseFloat(form.weight) || undefined,
+        volume: parseFloat(form.volume) || undefined,
+        freight: parseFloat(form.freight) || 0,
+        deliveryFee: parseFloat(form.deliveryFee) || 0,
+        insuranceFee: parseFloat(form.insuranceFee) || 0,
+        packingFee: parseFloat(form.packingFee) || 0,
+        otherFee: parseFloat(form.otherFee) || 0,
+      };
+      if (isEdit) {
+        await waybillApi.update(editId!, payload);
       } else {
-        const newWb = await createWaybill(form);
-        toast.success(`运单 ${newWb?.waybillNo || ''} 创建成功`);
-        navigate('/waybills');
+        await waybillApi.create(payload);
       }
-    } catch (err: any) {
-      toast.error(err.message || '操作失败');
+      navigate('/waybills');
+    } catch (e: any) {
+      alert(e.message || '保存失败');
+    } finally { setSaving(false); }
+  };
+
+  const handleReset = () => {
+    if (!isEdit) {
+      setForm({ senderName: '', senderPhone: '', senderAddress: '', receiverName: '', receiverPhone: '', receiverAddress: '', originId: '', destId: '', goodsName: '', goodsNo: '', quantity: '1', weight: '', volume: '', freight: '', deliveryFee: '', insuranceFee: '', packingFee: '', otherFee: '', payMethod: '现付', remark: '' });
     }
   };
+
+  const InputField = ({ label, value, onChange, placeholder, required, type = 'text', className = '' }: any) => (
+    <div className={`flex items-center gap-1 ${className}`}>
+      <label className="text-xs text-gray-600 whitespace-nowrap w-16 text-right shrink-0">
+        {required && <span className="text-red-500">*</span>}{label}:
+      </label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        className="flex-1 h-7 px-2 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-blue-500 min-w-0" />
+    </div>
+  );
+
+  const SelectField = ({ label, value, onChange, options, required }: any) => (
+    <div className="flex items-center gap-1">
+      <label className="text-xs text-gray-600 whitespace-nowrap w-16 text-right shrink-0">
+        {required && <span className="text-red-500">*</span>}{label}:
+      </label>
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className="flex-1 h-7 px-2 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-blue-500 min-w-0">
+        <option value="">请选择</option>
+        {options.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
 
   return (
     <DashboardLayout>
-      <div className="p-4 lg:p-6 max-w-5xl">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(isEdit ? `/waybills/${params.id}` : '/waybills')} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
-            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-foreground" style={{ fontFamily: 'DM Sans' }}>
-              {isEdit ? '编辑运单' : '受理开单'}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {isEdit ? '修改运单信息' : '填写运单信息，创建新运单'}
-            </p>
+      <div className="flex flex-col h-full bg-[#f0f2f5]">
+        {/* 顶部操作栏 */}
+        <div className="px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/waybills')} className="h-7 px-2 text-xs bg-white text-gray-600 rounded border border-gray-300 hover:bg-gray-50 flex items-center gap-1">
+              <ArrowLeft className="w-3 h-3" />返回
+            </button>
+            <h2 className="text-sm font-bold text-gray-800">{isEdit ? '修改运单' : '受理开单'}</h2>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={handleReset} className="h-7 px-3 text-xs bg-white text-gray-600 rounded border border-gray-300 hover:bg-gray-50 flex items-center gap-1">
+              <RotateCcw className="w-3 h-3" />重置
+            </button>
+            <button className="h-7 px-3 text-xs bg-white text-gray-600 rounded border border-gray-300 hover:bg-gray-50 flex items-center gap-1">
+              <Printer className="w-3 h-3" />打印
+            </button>
+            <button onClick={handleSubmit} disabled={saving} className="h-7 px-4 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400 flex items-center gap-1">
+              <Save className="w-3 h-3" />{saving ? '保存中...' : '保存'}
+            </button>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 站点信息 */}
-          <div className="bg-card border border-border rounded-lg p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-4">站点信息</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">发站</Label>
-                <Select value={form.originOrgId ? String(form.originOrgId) : ''} onValueChange={v => handleOrgChange('originOrgId', v)}>
-                  <SelectTrigger className="h-9 bg-background text-sm"><SelectValue placeholder="选择发站" /></SelectTrigger>
-                  <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">中转地</Label>
-                <Select value={form.transitOrgId ? String(form.transitOrgId) : '0'} onValueChange={v => handleOrgChange('transitOrgId', v)}>
-                  <SelectTrigger className="h-9 bg-background text-sm"><SelectValue placeholder="无中转" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">无中转</SelectItem>
-                    {orgs.map(o => <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">到站</Label>
-                <Select value={form.destOrgId ? String(form.destOrgId) : ''} onValueChange={v => handleOrgChange('destOrgId', v)}>
-                  <SelectTrigger className="h-9 bg-background text-sm"><SelectValue placeholder="选择到站" /></SelectTrigger>
-                  <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* 发货信息 */}
-          <div className="bg-card border border-border rounded-lg p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-4">发货信息</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">选择客户</Label>
-                <Select value={form.senderCustomerId ? String(form.senderCustomerId) : ''} onValueChange={handleCustomerChange}>
-                  <SelectTrigger className="h-9 bg-background text-sm"><SelectValue placeholder="选择发货客户" /></SelectTrigger>
-                  <SelectContent>{customers.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">发货方名称 *</Label>
-                <Input value={form.senderName} onChange={e => setForm(p => ({ ...p, senderName: e.target.value }))} className="h-9 text-sm" placeholder="发货公司/个人名称" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">联系电话</Label>
-                <Input value={form.senderPhone} onChange={e => setForm(p => ({ ...p, senderPhone: e.target.value }))} className="h-9 text-sm" placeholder="联系电话" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">发货地址</Label>
-                <Input value={form.senderAddress} onChange={e => setForm(p => ({ ...p, senderAddress: e.target.value }))} className="h-9 text-sm" placeholder="详细地址" />
-              </div>
-            </div>
-          </div>
-
-          {/* 收货信息 */}
-          <div className="bg-card border border-border rounded-lg p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-4">收货信息</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">收货人 *</Label>
-                <Input value={form.receiverName} onChange={e => setForm(p => ({ ...p, receiverName: e.target.value }))} className="h-9 text-sm" placeholder="收货人姓名" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">联系电话</Label>
-                <Input value={form.receiverPhone} onChange={e => setForm(p => ({ ...p, receiverPhone: e.target.value }))} className="h-9 text-sm" placeholder="收货人电话" />
-              </div>
-              <div className="md:col-span-2 space-y-2">
-                <Label className="text-xs text-muted-foreground">收货地址</Label>
-                <Input value={form.receiverAddress} onChange={e => setForm(p => ({ ...p, receiverAddress: e.target.value }))} className="h-9 text-sm" placeholder="详细收货地址" />
-              </div>
-            </div>
-          </div>
-
-          {/* 货物信息 */}
-          <div className="bg-card border border-border rounded-lg p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-4">货物信息</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">货物名称 *</Label>
-                <Input value={form.goodsName} onChange={e => setForm(p => ({ ...p, goodsName: e.target.value }))} className="h-9 text-sm" placeholder="货物名称" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">包装类型</Label>
-                <Select value={form.packingType} onValueChange={v => setForm(p => ({ ...p, packingType: v }))}>
-                  <SelectTrigger className="h-9 bg-background text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>{packingTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">件数</Label>
-                <Input type="number" min={1} value={form.quantity} onChange={e => setForm(p => ({ ...p, quantity: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">重量 (kg)</Label>
-                <Input type="number" min={0} step={0.1} value={form.weight} onChange={e => setForm(p => ({ ...p, weight: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">体积 (m³)</Label>
-                <Input type="number" min={0} step={0.01} value={form.volume} onChange={e => setForm(p => ({ ...p, volume: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">交接方式</Label>
-                <Select value={form.deliveryMethod} onValueChange={v => setForm(p => ({ ...p, deliveryMethod: v }))}>
-                  <SelectTrigger className="h-9 bg-background text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>{deliveryMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* 费用明细 */}
-          <div className="bg-card border border-border rounded-lg p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-4">费用明细</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">付款方式</Label>
-                <Select value={form.paymentMethod} onValueChange={v => setForm(p => ({ ...p, paymentMethod: v }))}>
-                  <SelectTrigger className="h-9 bg-background text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>{paymentMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">基本运费</Label>
-                <Input type="number" min={0} step={0.01} value={form.baseFreight} onChange={e => setForm(p => ({ ...p, baseFreight: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">保险费</Label>
-                <Input type="number" min={0} step={0.01} value={form.insuranceFee} onChange={e => setForm(p => ({ ...p, insuranceFee: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">接货费</Label>
-                <Input type="number" min={0} step={0.01} value={form.pickupFee} onChange={e => setForm(p => ({ ...p, pickupFee: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">送货费</Label>
-                <Input type="number" min={0} step={0.01} value={form.deliveryFee} onChange={e => setForm(p => ({ ...p, deliveryFee: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">包装费</Label>
-                <Input type="number" min={0} step={0.01} value={form.packingFee} onChange={e => setForm(p => ({ ...p, packingFee: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">其他费用</Label>
-                <Input type="number" min={0} step={0.01} value={form.otherFee} onChange={e => setForm(p => ({ ...p, otherFee: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground font-bold">总运费 (自动计算)</Label>
-                <div className="h-9 flex items-center px-3 bg-blue-50 border border-blue-200 rounded-md text-sm font-bold text-blue-700 tabular-nums">
-                  ¥ {totalFee.toFixed(2)}
+        {/* 表单主体 */}
+        <div className="flex-1 mx-3 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-full text-gray-400 text-sm">加载中...</div>
+          ) : (
+            <div className="space-y-3">
+              {/* 发货信息 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700">发货信息</div>
+                <div className="p-3 grid grid-cols-3 gap-3">
+                  <SelectField label="发站" value={form.originId} onChange={(v: string) => setField('originId', v)} required
+                    options={orgs.map(o => ({ label: o.name, value: String(o.id) }))} />
+                  <InputField label="发货人" value={form.senderName} onChange={(v: string) => setField('senderName', v)} placeholder="发货人姓名" required />
+                  <InputField label="电话" value={form.senderPhone} onChange={(v: string) => setField('senderPhone', v)} placeholder="发货人电话" />
+                  <InputField label="地址" value={form.senderAddress} onChange={(v: string) => setField('senderAddress', v)} placeholder="发货人地址" className="col-span-2" />
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* 代收货款与回单 */}
-          <div className="bg-card border border-border rounded-lg p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-4">代收货款与回单</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">代收货款 (元)</Label>
-                <Input type="number" min={0} step={0.01} value={form.codAmount} onChange={e => setForm(p => ({ ...p, codAmount: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
-                <p className="text-[10px] text-muted-foreground">代收货款将在签收后从收货方收取并返还给发货方</p>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">是否需要回单</Label>
-                <Select value={String(form.receiptRequired)} onValueChange={v => setForm(p => ({ ...p, receiptRequired: Number(v) }))}>
-                  <SelectTrigger className="h-9 bg-background text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">不需要</SelectItem>
-                    <SelectItem value="1">需要</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {form.receiptRequired === 1 && (
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">回单份数</Label>
-                  <Input type="number" min={1} value={form.receiptCount} onChange={e => setForm(p => ({ ...p, receiptCount: Number(e.target.value) }))} className="h-9 text-sm tabular-nums" />
+              {/* 收货信息 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700">收货信息</div>
+                <div className="p-3 grid grid-cols-3 gap-3">
+                  <SelectField label="到站" value={form.destId} onChange={(v: string) => setField('destId', v)} required
+                    options={orgs.map(o => ({ label: o.name, value: String(o.id) }))} />
+                  <InputField label="收货人" value={form.receiverName} onChange={(v: string) => setField('receiverName', v)} placeholder="收货人姓名" required />
+                  <InputField label="电话" value={form.receiverPhone} onChange={(v: string) => setField('receiverPhone', v)} placeholder="收货人电话" />
+                  <InputField label="地址" value={form.receiverAddress} onChange={(v: string) => setField('receiverAddress', v)} placeholder="收货地址" className="col-span-2" />
                 </div>
-              )}
+              </div>
+
+              {/* 货物信息 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700">货物信息</div>
+                <div className="p-3 grid grid-cols-4 gap-3">
+                  <InputField label="品名" value={form.goodsName} onChange={(v: string) => setField('goodsName', v)} placeholder="货物品名" />
+                  <InputField label="货号" value={form.goodsNo} onChange={(v: string) => setField('goodsNo', v)} placeholder="货号" />
+                  <InputField label="件数" value={form.quantity} onChange={(v: string) => setField('quantity', v)} type="number" />
+                  <InputField label="重量" value={form.weight} onChange={(v: string) => setField('weight', v)} placeholder="kg" type="number" />
+                  <InputField label="体积" value={form.volume} onChange={(v: string) => setField('volume', v)} placeholder="m³" type="number" />
+                </div>
+              </div>
+
+              {/* 费用信息 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700">费用信息</div>
+                <div className="p-3 grid grid-cols-4 gap-3">
+                  <InputField label="运费" value={form.freight} onChange={(v: string) => setField('freight', v)} placeholder="0.00" type="number" />
+                  <InputField label="送货费" value={form.deliveryFee} onChange={(v: string) => setField('deliveryFee', v)} placeholder="0.00" type="number" />
+                  <InputField label="保价费" value={form.insuranceFee} onChange={(v: string) => setField('insuranceFee', v)} placeholder="0.00" type="number" />
+                  <InputField label="包装费" value={form.packingFee} onChange={(v: string) => setField('packingFee', v)} placeholder="0.00" type="number" />
+                  <InputField label="其他费" value={form.otherFee} onChange={(v: string) => setField('otherFee', v)} placeholder="0.00" type="number" />
+                  <SelectField label="付款方式" value={form.payMethod} onChange={(v: string) => setField('payMethod', v)}
+                    options={[{ label: '现付', value: '现付' }, { label: '提付', value: '提付' }, { label: '月结', value: '月结' }, { label: '回单付', value: '回单付' }]} />
+                  <div className="flex items-center gap-1">
+                    <label className="text-xs text-gray-600 whitespace-nowrap w-16 text-right shrink-0">费用合计:</label>
+                    <span className="text-sm font-bold text-red-600">¥{totalFee.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 备注 */}
+              <div className="bg-white rounded border border-gray-200">
+                <div className="px-3 py-2 bg-[#f7f8fa] border-b border-gray-200 text-xs font-bold text-gray-700">备注</div>
+                <div className="p-3">
+                  <textarea value={form.remark} onChange={e => setField('remark', e.target.value)} placeholder="请输入备注信息"
+                    className="w-full h-16 px-2 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-blue-500 resize-none" />
+                </div>
+              </div>
+
+              <div className="h-3" />
             </div>
-          </div>
-
-          {/* 备注 */}
-          <div className="bg-card border border-border rounded-lg p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-4">备注</h2>
-            <Textarea
-              value={form.remark}
-              onChange={e => setForm(p => ({ ...p, remark: e.target.value }))}
-              placeholder="运单备注信息（可选）"
-              rows={3}
-              className="text-sm resize-none"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-3">
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Save className="w-4 h-4 mr-1.5" />
-              {isEdit ? '保存修改' : '创建运单'}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => navigate(isEdit ? `/waybills/${params.id}` : '/waybills')}>
-              取消
-            </Button>
-          </div>
-        </form>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );
