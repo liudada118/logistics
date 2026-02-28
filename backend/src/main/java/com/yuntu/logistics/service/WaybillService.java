@@ -15,5 +15,6 @@ public interface WaybillService {
     void updateWaybill(Long id, WaybillCreateRequest request);
     void deleteWaybill(Long id);
     void updateReceiptStatus(Long id, String receiptStatus, User currentUser);
+    void updateStatus(Long id, String status, String description, User currentUser);
     List<WaybillStatusLog> getStatusLogs(Long waybillId);
 }

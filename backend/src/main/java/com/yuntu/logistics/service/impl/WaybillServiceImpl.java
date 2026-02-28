@@ -221,6 +221,15 @@ public class WaybillServiceImpl implements WaybillService {
     }
 
     @Override
+    @Transactional
+    public void updateStatus(Long id, String status, String description, User currentUser) {
+        Waybill waybill = getWaybillById(id);
+        waybill.setStatus(status);
+        waybillMapper.updateById(waybill);
+        addStatusLog(id, status, description, currentUser);
+    }
+
+    @Override
     public List<WaybillStatusLog> getStatusLogs(Long waybillId) {
         LambdaQueryWrapper<WaybillStatusLog> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(WaybillStatusLog::getWaybillId, waybillId);

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -71,6 +72,35 @@ public class AlertController {
         alert.setHandlerName(currentUser != null ? currentUser.getFullName() : "系统");
         alert.setHandledAt(LocalDateTime.now());
         alertMapper.updateById(alert);
+        return Result.success(null);
+    }
+
+    /** 标记已读 */
+    @PutMapping("/{id}/read")
+    public Result<Void> read(@PathVariable Long id) {
+        Alert alert = alertMapper.selectById(id);
+        if (alert == null) return Result.error("预警记录不存在");
+        if ("未处理".equals(alert.getStatus())) {
+            alert.setStatus("已处理");
+            alert.setHandledAt(LocalDateTime.now());
+            alertMapper.updateById(alert);
+        }
+        return Result.success(null);
+    }
+
+    /** 批量标记已读 */
+    @PutMapping("/batch-read")
+    public Result<Void> batchRead(@RequestBody Map<String, List<Long>> body) {
+        List<Long> ids = body.get("ids");
+        if (ids == null || ids.isEmpty()) return Result.error("请选择要标记的记录");
+        for (Long id : ids) {
+            Alert alert = alertMapper.selectById(id);
+            if (alert != null && "未处理".equals(alert.getStatus())) {
+                alert.setStatus("已处理");
+                alert.setHandledAt(LocalDateTime.now());
+                alertMapper.updateById(alert);
+            }
+        }
         return Result.success(null);
     }
 }
