@@ -76,12 +76,14 @@ export interface PageResult<T> {
 
 // ==================== 运单 ====================
 export const waybillApi = {
-  list: (params: { page?: number; size?: number; status?: string; keyword?: string } = {}) => {
+  list: (params: { page?: number; size?: number; status?: string; keyword?: string; dateFrom?: string; dateTo?: string } = {}) => {
     const qs = new URLSearchParams();
     if (params.page) qs.set('page', String(params.page));
     if (params.size) qs.set('size', String(params.size));
     if (params.status) qs.set('status', params.status);
     if (params.keyword) qs.set('keyword', params.keyword);
+    if (params.dateFrom) qs.set('dateFrom', params.dateFrom);
+    if (params.dateTo) qs.set('dateTo', params.dateTo);
     return request<PageResult<any>>(`/api/waybills?${qs.toString()}`);
   },
   get: (id: number) => request<any>(`/api/waybills/${id}`),

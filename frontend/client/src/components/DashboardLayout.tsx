@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import React, { type ReactNode, useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -83,6 +83,27 @@ const menuGroups: MenuGroup[] = [
   },
 ];
 
+// 独立的全局搜索框组件，拥有自己的 state，不会干扰其他表单
+function GlobalSearch() {
+  const [query, setQuery] = useState('');
+  const [, navigate] = useLocation();
+  const handleSearch = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && query.trim()) {
+      navigate(`/waybills?search=${encodeURIComponent(query.trim())}`);
+    }
+  };
+  return (
+    <input
+      type="text"
+      value={query}
+      onChange={e => setQuery(e.target.value)}
+      onKeyDown={handleSearch}
+      placeholder="请输入任意关键字查询"
+      className="w-full h-7 pl-3 pr-8 text-xs bg-[#2d2d44] border border-[#3d3d5c] rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+    />
+  );
+}
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     '营运中心': true,
@@ -135,11 +156,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* 中间搜索框 */}
         <div className="flex-1 flex justify-center">
           <div className="relative w-80">
-            <input
-              type="text"
-              placeholder="请输入任意关键字查询"
-              className="w-full h-7 pl-3 pr-8 text-xs bg-[#2d2d44] border border-[#3d3d5c] rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-            />
+            <GlobalSearch />
             <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
           </div>
         </div>

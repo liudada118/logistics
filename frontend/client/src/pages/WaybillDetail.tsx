@@ -73,8 +73,8 @@ export default function WaybillDetail() {
                   <InfoRow label="运单号" value={<span className="font-mono font-medium text-blue-600">{data.waybillNo}</span>} />
                   <InfoRow label="货号" value={data.goodsNo} />
                   <InfoRow label="状态" value={<span className={`text-xs px-1.5 py-0.5 rounded ${statusColor(data.status)}`}>{data.status}</span>} />
-                  <InfoRow label="开单时间" value={data.createTime} />
-                  <InfoRow label="付款方式" value={data.payMethod} />
+                  <InfoRow label="开单时间" value={data.createdAt} />
+                  <InfoRow label="付款方式" value={data.paymentMethod} />
                 </div>
               </div>
 
@@ -84,7 +84,7 @@ export default function WaybillDetail() {
                   <MapPin className="w-3.5 h-3.5 text-green-500" />发货信息
                 </div>
                 <div className="px-3 py-1">
-                  <InfoRow label="发站" value={data.senderOrgName || data.originName} />
+                  <InfoRow label="发站" value={data.originOrgName} />
                   <InfoRow label="发货人" value={data.senderName} />
                   <InfoRow label="电话" value={data.senderPhone} />
                   <InfoRow label="地址" value={data.senderAddress} />
@@ -97,7 +97,7 @@ export default function WaybillDetail() {
                   <MapPin className="w-3.5 h-3.5 text-red-500" />收货信息
                 </div>
                 <div className="px-3 py-1">
-                  <InfoRow label="到站" value={data.receiverOrgName || data.destName} />
+                  <InfoRow label="到站" value={data.destOrgName} />
                   <InfoRow label="收货人" value={data.receiverName} />
                   <InfoRow label="电话" value={data.receiverPhone} />
                   <InfoRow label="地址" value={data.receiverAddress} />
@@ -123,11 +123,11 @@ export default function WaybillDetail() {
                   <DollarSign className="w-3.5 h-3.5 text-yellow-500" />费用信息
                 </div>
                 <div className="px-3 py-1">
-                  <InfoRow label="运费" value={data.freight ? `¥${data.freight}` : '-'} />
-                  <InfoRow label="送货费" value={data.deliveryFee ? `¥${data.deliveryFee}` : '-'} />
-                  <InfoRow label="保价费" value={data.insuranceFee ? `¥${data.insuranceFee}` : '-'} />
-                  <InfoRow label="包装费" value={data.packingFee ? `¥${data.packingFee}` : '-'} />
-                  <InfoRow label="费用合计" value={<span className="font-bold text-red-600">¥{data.totalFee || data.freight || 0}</span>} />
+                  <InfoRow label="基本运费" value={data.baseFreight ? `¥${Number(data.baseFreight).toFixed(2)}` : '-'} />
+                  <InfoRow label="送货费" value={data.deliveryFee ? `¥${Number(data.deliveryFee).toFixed(2)}` : '-'} />
+                  <InfoRow label="保险费" value={data.insuranceFee ? `¥${Number(data.insuranceFee).toFixed(2)}` : '-'} />
+                  <InfoRow label="接货费" value={data.pickupFee ? `¥${Number(data.pickupFee).toFixed(2)}` : '-'} />
+                  <InfoRow label="运费合计" value={<span className="font-bold text-red-600">¥{data.freightFee ? Number(data.freightFee).toFixed(2) : '0.00'}</span>} />
                 </div>
               </div>
 
