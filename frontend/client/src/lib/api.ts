@@ -111,6 +111,8 @@ export const transportApi = {
   confirmLoading: (id: number) => request<void>(`/api/transport-tasks/${id}/loading`, { method: 'PUT' }),
   confirmDeparture: (id: number) => request<void>(`/api/transport-tasks/${id}/depart`, { method: 'PUT' }),
   confirmArrival: (id: number) => request<void>(`/api/transport-tasks/${id}/arrive`, { method: 'PUT' }),
+  assignWaybills: (id: number, waybillIds: number[]) =>
+    request<void>(`/api/transport-tasks/${id}/waybills`, { method: 'POST', body: JSON.stringify({ waybillIds }) }),
 };
 
 // ==================== 库存 ====================

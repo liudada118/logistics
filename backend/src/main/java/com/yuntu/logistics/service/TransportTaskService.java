@@ -8,6 +8,9 @@ public interface TransportTaskService {
     /** 创建运输任务（调度） */
     TransportTask createTask(Long routeId, Long vehicleId, List<Long> waybillIds, Long creatorId, String creatorName);
 
+    /** 向已有派车单追加运单 */
+    void assignWaybills(Long taskId, List<Long> waybillIds);
+
     /** 确认装车 */
     void confirmLoading(Long taskId);
 

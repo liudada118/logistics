@@ -24,12 +24,19 @@ public class TransportTaskController {
         Long vehicleId = Long.valueOf(body.get("vehicleId").toString());
         @SuppressWarnings("unchecked")
         List<Long> waybillIds = ((List<Number>) body.get("waybillIds")).stream().map(Number::longValue).toList();
-        // 实际项目中从 SecurityContext 获取当前用户
         Long creatorId = body.containsKey("creatorId") ? Long.valueOf(body.get("creatorId").toString()) : 1L;
         String creatorName = body.containsKey("creatorName") ? body.get("creatorName").toString() : "系统管理员";
-
         TransportTask task = transportTaskService.createTask(routeId, vehicleId, waybillIds, creatorId, creatorName);
         return Result.success(task);
+    }
+
+    /** 向已有派车单追加运单 */
+    @PostMapping("/{id}/waybills")
+    public Result<Void> assignWaybills(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        @SuppressWarnings("unchecked")
+        List<Long> waybillIds = ((List<Number>) body.get("waybillIds")).stream().map(Number::longValue).toList();
+        transportTaskService.assignWaybills(id, waybillIds);
+        return Result.success(null);
     }
 
     /** 确认装车 */

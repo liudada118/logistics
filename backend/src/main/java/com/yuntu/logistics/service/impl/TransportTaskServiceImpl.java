@@ -195,6 +195,45 @@ public class TransportTaskServiceImpl implements TransportTaskService {
     }
 
     @Override
+    @Transactional
+    public void assignWaybills(Long taskId, List<Long> waybillIds) {
+        TransportTask task = transportTaskMapper.selectById(taskId);
+        if (task == null) throw new RuntimeException("派车单不存在");
+        if (!"待装车".equals(task.getStatus())) {
+            throw new RuntimeException("只有待装车状态的派车单才能追加运单");
+        }
+        List<Waybill> waybills = waybillMapper.selectBatchIds(waybillIds);
+        for (Waybill w : waybills) {
+            if (!"待调度".equals(w.getStatus())) continue;
+            TransportWaybill tw = new TransportWaybill();
+            tw.setTransportTaskId(taskId);
+            tw.setWaybillId(w.getId());
+            transportWaybillMapper.insert(tw);
+            w.setStatus("已调度");
+            w.setTransportTaskId(taskId);
+            waybillMapper.updateById(w);
+        }
+        // 重新统计汇总数据
+        LambdaQueryWrapper<TransportWaybill> twQuery = new LambdaQueryWrapper<>();
+        twQuery.eq(TransportWaybill::getTransportTaskId, taskId);
+        List<TransportWaybill> allTw = transportWaybillMapper.selectList(twQuery);
+        List<Long> allWaybillIds = allTw.stream().map(TransportWaybill::getWaybillId).toList();
+        if (!allWaybillIds.isEmpty()) {
+            List<Waybill> allWaybills = waybillMapper.selectBatchIds(allWaybillIds);
+            BigDecimal totalWeight = allWaybills.stream().map(Waybill::getWeight)
+                    .filter(v -> v != null).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalVolume = allWaybills.stream().map(Waybill::getVolume)
+                    .filter(v -> v != null).reduce(BigDecimal.ZERO, BigDecimal::add);
+            int totalQuantity = allWaybills.stream().mapToInt(w -> w.getQuantity() != null ? w.getQuantity() : 0).sum();
+            task.setWaybillCount(allWaybills.size());
+            task.setTotalWeight(totalWeight);
+            task.setTotalVolume(totalVolume);
+            task.setTotalQuantity(totalQuantity);
+            transportTaskMapper.updateById(task);
+        }
+    }
+
+    @Override
     public IPage<TransportTask> page(int pageNum, int pageSize, String status, String keyword) {
         LambdaQueryWrapper<TransportTask> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(status)) {
